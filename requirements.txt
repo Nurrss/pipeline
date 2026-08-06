@@ -1,5 +1,5 @@
 # LLM
-google-generativeai>=0.8    # Gemini API, бесплатный tier
+google-genai>=1.0           # Gemini API (текущий SDK; google-generativeai устарел)
 groq>=0.11                  # запасной LLM-провайдер, бесплатный tier
 
 # PDF-парсинг
