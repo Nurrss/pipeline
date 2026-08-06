@@ -40,8 +40,7 @@ RULES: list[tuple[str, re.Pattern]] = [
     # оставить в CAPEX, ломает агрегатные тесты "Максимальные расходы по категории".
     ("FINANCING_INFLOW", re.compile(r"term loan facility drawdown|drawdown", re.I)),
     ("CAPEX", re.compile(
-        r"purchase of .* equipment|transfer of .* equipment to subsidiary|"
-        r"flood remediation and silo repair works",
+        r"purchase of .* equipment|transfer of .* equipment to subsidiary",
         re.I,
     )),
     ("INTEREST", re.compile(
