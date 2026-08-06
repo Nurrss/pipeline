@@ -1,0 +1,24 @@
+# LLM
+google-generativeai>=0.8    # Gemini API, бесплатный tier
+groq>=0.11                  # запасной LLM-провайдер, бесплатный tier
+
+# PDF-парсинг
+pymupdf>=1.24               # быстрый текст из PDF
+pdfplumber>=0.11            # таблицы из PDF
+pytesseract>=0.3            # OCR на случай сканов (нужен системный tesseract)
+pillow>=10.0
+
+# Эмбеддинги и поиск
+sentence-transformers>=3.0  # BAAI/bge-m3
+faiss-cpu>=1.8
+
+# Оркестрация агента
+langgraph>=0.2
+langchain-core>=0.3
+
+# Валидация и утилиты
+pydantic>=2.8
+python-dotenv>=1.0
+
+# Тесты
+pytest>=8.0

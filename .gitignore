@@ -1,0 +1,27 @@
+# Данные — НЕ коммитим (публичный/приватный датасет, ground truth, PDF)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Локальная копия публичного датасета — тоже не коммитим (документы, леджер, ground truth)
+agentic-bank-public/*
+!agentic-bank-public/CASE.ru.md
+!agentic-bank-public/CASE.kz.md
+
+# Секреты
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+
+# Итоговый сабмишн — коммитим осознанно вручную перед сдачей, не автоматически
+# (снимите этот комментарий и не игнорьте submission.json, когда будете готовы сдавать)
