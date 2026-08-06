@@ -5,8 +5,10 @@
 
 Категории покрывают термины, которые реально фигурируют в текстах ковенантов
 (Статья 6 договоров): выручка, капитальные затраты (CAPEX), операционные расходы
-и их подкатегории — аренда, ФОТ (payroll), коммунальные услуги, налоги, страхование,
-проценты, маркетинг, обслуживание/ремонт.
+(OPEX — самостоятельная строка леджера для EBITDA-формул, см. ниже) и их
+подкатегории — аренда, ФОТ (payroll), коммунальные услуги, налоги, страхование,
+проценты, маркетинг, обслуживание/ремонт, а также приток по финансированию
+(FINANCING_INFLOW — drawdown по кредитной линии, не капзатраты).
 
 Это первый (rule-based) слой. Транзакции, не подошедшие ни под одно правило,
 помечаются как OTHER — их стоит явно вывести и разобрать (руками или LLM-фолбэком),
@@ -20,9 +22,25 @@ from dataclasses import dataclass
 # Порядок важен: правила проверяются по порядку, побеждает первое совпадение.
 RULES: list[tuple[str, re.Pattern]] = [
     ("REVENUE", re.compile(r"\bsales settlement\b|\bthroughput sales\b|capacity sales settlement|\bsales settlement", re.I)),
+    # Общая статья "Операционные расходы" (используется в формулах EBITDA/ratio-ковенантов
+    # как самостоятельный термин) — это ОДНА конкретная строка леджера на сценарий, а не
+    # сумма прочих категорий. Отличаем её от точечных статей обслуживания/ремонта (которые
+    # остаются в MAINTENANCE) по характерной формулировке "servicing and operating costs" /
+    # "operating (and maintenance) expenses". Проверено численно против ground truth
+    # (B1 6.1/6.2, P1 6.1) — подстановка суммы прочих категорий в Opex даёт совершенно
+    # нереалистичные (на порядки завышенные) значения, а эта единственная строка идеально
+    # воспроизводит эталонный коэффициент.
+    ("OPEX", re.compile(
+        r"servicing and operating costs|operating (and maintenance )?expenses",
+        re.I,
+    )),
+    # "Term loan facility drawdown" — это приток по финансированию (положительная сумма),
+    # а не капитальные затраты, несмотря на упоминание "expansion"/"turnaround". Нужен
+    # отдельно для ковенантов P2 6.1 / P3 6.1 ("поступления по финансированию"); если
+    # оставить в CAPEX, ломает агрегатные тесты "Максимальные расходы по категории".
+    ("FINANCING_INFLOW", re.compile(r"term loan facility drawdown|drawdown", re.I)),
     ("CAPEX", re.compile(
         r"purchase of .* equipment|transfer of .* equipment to subsidiary|"
-        r"term loan facility drawdown for .*(expansion|turnaround)|"
         r"flood remediation and silo repair works",
         re.I,
     )),
@@ -49,7 +67,7 @@ RULES: list[tuple[str, re.Pattern]] = [
         re.I,
     )),
     ("MAINTENANCE", re.compile(
-        r"servicing and operating costs|maintenance|repair works|inspection and survey servicing|"
+        r"maintenance|repair works|inspection and survey servicing|"
         r"arbitration and legal servicing|servicing contract|risk survey servicing|"
         r"fire safety systems servicing|silt cleaning and clearance works",
         re.I,
