@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 
 from agent.llm_client import generate_structured
-from covenants.schema import CovenantFormula, CovenantFormulaSet
+from covenants.schema import AllCovenantFormulas, CovenantFormula, CovenantFormulaSet
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE_PATH = ROOT / "data/processed/covenant_formulas.json"
@@ -155,6 +155,40 @@ def parse_scenario_covenants(
     return formulas
 
 
+def parse_all_scenarios(
+    scenarios: dict[str, tuple[str, str]],
+    *,
+    use_cache: bool = True,
+) -> dict[str, list[CovenantFormula]]:
+    """scenarios: scenario_id -> (borrower_name, article6_text). Один запрос к LLM
+    на ВСЕ отсутствующие в кэше сценарии разом (см. докстринг llm_client про лимит
+    запросов в день на бесплатном тарифе)."""
+    cache = _load_cache() if use_cache else {}
+    missing = {sid: v for sid, v in scenarios.items() if not (use_cache and sid in cache)}
+
+    if missing:
+        blocks = "\n\n".join(
+            f"===== scenario_id: {sid} =====\n"
+            f"borrower_name (по умолчанию, если не найдёшь в тексте): {name}\n\n"
+            f"Текст Статьи 6:\n{text}"
+            for sid, (name, text) in missing.items()
+        )
+        user_prompt = (
+            "Ниже — Статья 6 кредитных договоров НЕСКОЛЬКИХ заёмщиков, разделённые "
+            "заголовками '===== scenario_id: XXX ====='. Для каждого верни отдельный "
+            "элемент в scenarios с соответствующим scenario_id и тремя формулами "
+            "(6.1/6.2/6.3).\n\n" + blocks
+        )
+        result = generate_structured(SYSTEM_PROMPT, user_prompt, AllCovenantFormulas)
+        for sc in result.scenarios:
+            for f in sc.formulas:
+                f.scenario_id = sc.scenario_id
+            cache[sc.scenario_id] = [f.model_dump() for f in sc.formulas]
+        _save_cache(cache)
+
+    return {sid: [CovenantFormula.model_validate(f) for f in cache[sid]] for sid in scenarios}
+
+
 if __name__ == "__main__":
     import re
     import sys
@@ -171,6 +205,7 @@ if __name__ == "__main__":
     bundles = build_scenario_bundles(docs, acc_map)
 
     only = sys.argv[1:] if len(sys.argv) > 1 else sorted(bundles)
+    scenarios: dict[str, tuple[str, str]] = {}
     for sid in only:
         b = bundles[sid]
         text = b.current_agreement.text
@@ -181,8 +216,11 @@ if __name__ == "__main__":
 
         borrower_m = re.search(r"Заёмщик[,:]?\s*([A-Z][\w\s]+(?:JSC|LLP|LLC))", article6)
         borrower = borrower_m.group(1).strip() if borrower_m else sid
+        scenarios[sid] = (borrower, article6)
 
-        formulas = parse_scenario_covenants(sid, borrower, article6)
+    all_formulas = parse_all_scenarios(scenarios)
+    for sid in only:
+        formulas = all_formulas[sid]
         print(f"=== {sid} ===")
         for f in formulas:
             print(

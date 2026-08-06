@@ -95,6 +95,18 @@ class CovenantFormulaSet(BaseModel):
     formulas: list[CovenantFormula]
 
 
+class ScenarioCovenants(BaseModel):
+    scenario_id: str
+    formulas: list[CovenantFormula]
+
+
+class AllCovenantFormulas(BaseModel):
+    """Обёртка для батч-вызова: формулы сразу по всем сценариям за один запрос к LLM
+    (бесплатный тариф Gemini жёстко ограничен по числу запросов в день — экономим их)."""
+
+    scenarios: list[ScenarioCovenants]
+
+
 # ---------------------------------------------------------------------------
 # Факты из аудит-примечаний / KYC-досье
 # ---------------------------------------------------------------------------
@@ -164,3 +176,9 @@ class ScenarioFacts(BaseModel):
     addbacks: list[Addback] = Field(default_factory=list)
     point_in_time_items: list[PointInTimeItem] = Field(default_factory=list)
     notes: str = ""  # свободный текст — прочие наблюдения, не влияющие на расчёт напрямую
+
+
+class AllScenarioFacts(BaseModel):
+    """Обёртка для батч-вызова: факты сразу по всем сценариям за один запрос к LLM."""
+
+    scenarios: list[ScenarioFacts]

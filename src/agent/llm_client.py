@@ -44,15 +44,23 @@ def generate_structured(
     response_model: type[T],
     *,
     model: str | None = None,
-    retries: int = 2,
+    retries: int = 4,
+    max_output_tokens: int = 65536,
 ) -> T:
-    """Один вызов Gemini с ответом, провалидированным по response_model (pydantic)."""
+    """Один вызов Gemini с ответом, провалидированным по response_model (pydantic).
+
+    Бесплатный тариф Gemini жёстко ограничен по числу запросов в день (~20 для
+    gemini-2.5-flash на момент написания) — вызывающий код должен по возможности
+    батчить работу (все сценарии за один запрос), а не звать это по одному на
+    сценарий. При 429 (rate limit) ждём подсказанный API retry_delay, если он есть.
+    """
     client = get_client()
     config = types.GenerateContentConfig(
         temperature=0,
         system_instruction=system_prompt,
         response_mime_type="application/json",
         response_schema=response_model,
+        max_output_tokens=max_output_tokens,
     )
 
     last_err: Exception | None = None
@@ -71,6 +79,17 @@ def generate_structured(
         except Exception as e:  # сетевые сбои, невалидный JSON, rate limit
             last_err = e
             if attempt < retries:
-                time.sleep(2 * (attempt + 1))
+                delay = _extract_retry_delay(e) or (5 * (attempt + 1))
+                time.sleep(delay)
                 continue
     raise RuntimeError(f"Gemini structured-output вызов не удался после {retries + 1} попыток: {last_err}") from last_err
+
+
+def _extract_retry_delay(exc: Exception) -> float | None:
+    """Google API возвращает подсказку retryDelay в теле 429-ошибки (напр. '14s')."""
+    import re
+
+    m = re.search(r"retryDelay['\"]?:\s*['\"]?(\d+)", str(exc))
+    if m:
+        return float(m.group(1)) + 2.0
+    return None
